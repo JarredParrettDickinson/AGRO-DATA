@@ -70,3 +70,28 @@ def get_center_lat_long(STATE_ALPHA):
     lon = df_state['LONG'].iloc[0]
     return lat, lon
 
+def get_sub_df(df, unit, cat, year, state):
+    df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
+    
+    if state != "United States" and state != None:
+        df_cur = df_cur.loc[(df_cur["STATE_ALPHA"] == str(state))]
+
+        
+    if str(year) != "NOT SPECIFIED" and year != None:
+        df_cur = df_cur.loc[(df_cur["YEAR"] == int(year))]
+
+
+    if unit != "NOT SPECIFIED" and unit != None:
+        df_cur = df_cur.loc[(df_cur["DOMAINCAT_DESC"] == str(unit))]
+
+    return df_cur
+
+def add_state_county_string(df):
+    new_col = []
+    for ind in df.index:
+        county = (df["COUNTY_NAME"][ind])
+        state = (df["STATE_ALPHA"][ind])
+        col_val = str(county)+","+str(state)
+        new_col.append(str(col_val))
+    df["STATE_COUNTY"]=new_col
+    return df

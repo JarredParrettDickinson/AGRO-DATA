@@ -58,12 +58,7 @@ df_full_data["County Code"] = df_full_data["County Code"].apply(
 df_full_data["County"] = (
     df_full_data["Unnamed: 0"] + ", " + df_full_data.County.map(str)
 )
-"""def make_bins_for_cat(df):
-    merged = df.copy()
-    #per request work - make bins and add to sheet
-    merged['val_bins'] = (pd.cut(x=merged['VALUE'], bins=16))
-    merged['val_bins']=merged['val_bins'].astype(str)
-    return merged"""
+
 
 
 BINS = sorted(make_bins_for_cat(df_cur).val_bins.unique())
@@ -237,27 +232,15 @@ app.layout = html.Div(
                 html.Div(
                     id="graph-container",
                     children=[
-                        html.P(id="chart-selector", children="Select chart:"),
+                        html.P(id="chart-selector", children="Select chart:(at the moment only one chart)"),
                         dcc.Dropdown(
                             options=[
                                 {
-                                    "label": "Histogram of total number of deaths (single year)",
-                                    "value": "show_absolute_deaths_single_year",
-                                },
-                                {
-                                    "label": "Histogram of total number of deaths (1999-2016)",
-                                    "value": "absolute_deaths_all_time",
-                                },
-                                {
-                                    "label": "Age-adjusted death rate (single year)",
-                                    "value": "show_death_rate_single_year",
-                                },
-                                {
-                                    "label": "Trends in age-adjusted death rate (1999-2016)",
-                                    "value": "death_rate_all_time",
-                                },
+                                    "label": "Selected Data",
+                                    "value": "Selected Data",
+                                }
                             ],
-                            value="show_death_rate_single_year",
+                            value="Selected Data",
                             id="chart-dropdown",
                         ),
                         dcc.Graph(
@@ -291,23 +274,7 @@ def display_map(unit, cat, year, state, figure):
     string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
     print(string)
 
-    df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
-    string = "length after SHORT DESC: " + str(len(df_cur))
-    
-    if state != "United States" and state != None:
-        df_cur = df_cur.loc[(df_cur["STATE_ALPHA"] == str(state))]
-    string = "length after STATE: " + str(len(df_cur))
-
-        
-    if str(year) != "NOT SPECIFIED" and year != None:
-        df_cur = df_cur.loc[(df_cur["YEAR"] == int(year))]
-    string = "length after YEAR: " + str(len(df_cur))
-
-
-    if unit != "NOT SPECIFIED" and unit != None:
-        df_cur = df_cur.loc[(df_cur["DOMAINCAT_DESC"] == str(unit))]
-    string = "length after DOM: " + str(len(df_cur))
-
+    df_cur = get_sub_df(df, unit, cat, year, state)
 
     df_cur = make_bins_for_cat(df_cur)
     BINS = sorted(df_cur.val_bins.unique())
@@ -327,8 +294,8 @@ def display_map(unit, cat, year, state, figure):
             showarrow=False,
             align="right",
             text="<b>Categories Low-High</b>",
-            font=dict(color="#2cfec1"),
-            bgcolor="#1f2630",
+            font=dict(color="#1e392a"),
+            bgcolor="#f5f5f5",
             x=0.95,
             y=0.95,
         )
@@ -345,8 +312,8 @@ def display_map(unit, cat, year, state, figure):
                 ay=0,
                 arrowwidth=5,
                 arrowhead=0,
-                bgcolor="#1f2630",
-                font=dict(color="#2cfec1"),
+                bgcolor="#f5f5f5",
+                font=dict(color="#1e392a"),
             )
         )
     #change this to state and united states
@@ -431,110 +398,52 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     for i in range(len(fips)):
         if len(fips[i]) == 4:
             fips[i] = "0" + fips[i]
-    dff = df_full_data[df_full_data["County Code"].isin(fips)]
-    dff = dff.sort_values("Year")
+    #dff = get_sub_df(df, unit, cat, year, state)
+    #print(dff.columns)
+    dff = (df[df["COUNTY_FIP"].isin(fips)]).copy()
+    
+    dff = dff.sort_values("YEAR")
+    print("made it here")
+    #regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
+    #dff["Age Adjusted Rate"] = dff["Age Adjusted Rate"].replace(regex_pat, 0)
 
-    regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
-    dff["Age Adjusted Rate"] = dff["Age Adjusted Rate"].replace(regex_pat, 0)
+    #gets data
+    #get dataframe
 
-    if chart_dropdown != "death_rate_all_time":
-        title = "Absolute deaths per county, <b>1999-2016</b>"
-        AGGREGATE_BY = "Deaths"
-        if "show_absolute_deaths_single_year" == chart_dropdown:
-            dff = dff[dff.Year == year]
-            title = "Absolute deaths per county, <b>{0}</b>".format(year)
-        elif "show_death_rate_single_year" == chart_dropdown:
-            dff = dff[dff.Year == year]
-            title = "Age-adjusted death rate per county, <b>{0}</b>".format(year)
-            AGGREGATE_BY = "Age Adjusted Rate"
-
-        dff[AGGREGATE_BY] = pd.to_numeric(dff[AGGREGATE_BY], errors="coerce")
-        deaths_or_rate_by_fips = dff.groupby("County")[AGGREGATE_BY].sum()
-        deaths_or_rate_by_fips = deaths_or_rate_by_fips.sort_values()
-        # Only look at non-zero rows:
-        deaths_or_rate_by_fips = deaths_or_rate_by_fips[deaths_or_rate_by_fips > 0]
-        fig = deaths_or_rate_by_fips.iplot(
-            kind="bar", y=AGGREGATE_BY, title=title, asFigure=True
-        )
-
-        fig_layout = fig["layout"]
-        fig_data = fig["data"]
-
-        fig_data[0]["text"] = deaths_or_rate_by_fips.values.tolist()
-        fig_data[0]["marker"]["color"] = "#2cfec1"
-        fig_data[0]["marker"]["opacity"] = 1
-        fig_data[0]["marker"]["line"]["width"] = 0
-        fig_data[0]["textposition"] = "outside"
-        fig_layout["paper_bgcolor"] = "#1f2630"
-        fig_layout["plot_bgcolor"] = "#1f2630"
-        fig_layout["font"]["color"] = "#2cfec1"
-        fig_layout["title"]["font"]["color"] = "#2cfec1"
-        fig_layout["xaxis"]["tickfont"]["color"] = "#2cfec1"
-        fig_layout["yaxis"]["tickfont"]["color"] = "#2cfec1"
-        fig_layout["xaxis"]["gridcolor"] = "#5b5b5b"
-        fig_layout["yaxis"]["gridcolor"] = "#5b5b5b"
-        fig_layout["margin"]["t"] = 75
-        fig_layout["margin"]["r"] = 50
-        fig_layout["margin"]["b"] = 100
-        fig_layout["margin"]["l"] = 50
-
-        return fig
-
-    fig = dff.iplot(
-        kind="area",
-        x="Year",
-        y="Age Adjusted Rate",
-        text="County",
-        categories="County",
-        colors=[
-            "#1b9e77",
-            "#d95f02",
-            "#7570b3",
-            "#e7298a",
-            "#66a61e",
-            "#e6ab02",
-            "#a6761d",
-            "#666666",
-            "#1b9e77",
-        ],
-        vline=[year],
-        asFigure=True,
+    title = str(year)+", " + str(state.upper())+",    " + str(cat) + " for selection"
+    dff= get_sub_df(dff, unit, cat, year, "United States").copy()
+    dff = add_state_county_string(dff)
+    AGGREGATE_BY = "VALUE"
+    
+    dff[AGGREGATE_BY] = pd.to_numeric(dff[AGGREGATE_BY], errors="coerce")
+    deaths_or_rate_by_fips = dff.groupby("STATE_COUNTY")[AGGREGATE_BY].sum()
+    deaths_or_rate_by_fips = deaths_or_rate_by_fips.sort_values()
+    # Only look at non-zero rows:
+    deaths_or_rate_by_fips = deaths_or_rate_by_fips[deaths_or_rate_by_fips > 0]
+    fig = deaths_or_rate_by_fips.iplot(
+        kind="bar", y=AGGREGATE_BY, title=title, asFigure=True
     )
 
-    for i, trace in enumerate(fig["data"]):
-        trace["mode"] = "lines+markers"
-        trace["marker"]["size"] = 4
-        trace["marker"]["line"]["width"] = 1
-        trace["type"] = "scatter"
-        for prop in trace:
-            fig["data"][i][prop] = trace[prop]
-
-    # Only show first 500 lines
-    fig["data"] = fig["data"][0:500]
-
     fig_layout = fig["layout"]
+    fig_data = fig["data"]
 
-    # See plot.ly/python/reference
-    fig_layout["yaxis"]["title"] = "Age-adjusted death rate per county per year"
-    fig_layout["xaxis"]["title"] = ""
-    fig_layout["yaxis"]["fixedrange"] = True
-    fig_layout["xaxis"]["fixedrange"] = False
-    fig_layout["hovermode"] = "closest"
-    fig_layout["title"] = "<b>{0}</b> counties selected".format(len(fips))
-    fig_layout["legend"] = dict(orientation="v")
-    fig_layout["autosize"] = True
-    fig_layout["paper_bgcolor"] = "#1f2630"
-    fig_layout["plot_bgcolor"] = "#1f2630"
-    fig_layout["font"]["color"] = "#2cfec1"
-    fig_layout["xaxis"]["tickfont"]["color"] = "#2cfec1"
-    fig_layout["yaxis"]["tickfont"]["color"] = "#2cfec1"
+    fig_data[0]["text"] = deaths_or_rate_by_fips.values.tolist()
+    fig_data[0]["marker"]["color"] = "#c9d2d3"
+    fig_data[0]["marker"]["opacity"] = 1
+    fig_data[0]["marker"]["line"]["width"] = 0
+    fig_data[0]["textposition"] = "outside"
+    fig_layout["paper_bgcolor"] = "#f5f5f5"#"#1f2630"
+    fig_layout["plot_bgcolor"] = "#f5f5f5"#"#1f2630"
+    fig_layout["font"]["color"] = "#1e392a"
+    fig_layout["title"]["font"]["color"] = "#1e392a"
+    fig_layout["xaxis"]["tickfont"]["color"] = "#1e392a"
+    fig_layout["yaxis"]["tickfont"]["color"] = "#1e392a"
     fig_layout["xaxis"]["gridcolor"] = "#5b5b5b"
     fig_layout["yaxis"]["gridcolor"] = "#5b5b5b"
-
-    if len(fips) > 500:
-        fig["layout"][
-            "title"
-        ] = "Age-adjusted death rate per county per year <br>(only 1st 500 shown)"
+    fig_layout["margin"]["t"] = 75
+    fig_layout["margin"]["r"] = 50
+    fig_layout["margin"]["b"] = 100
+    fig_layout["margin"]["l"] = 50
 
     return fig
 
