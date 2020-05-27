@@ -22,7 +22,7 @@ from geojson import Feature, Point, FeatureCollection, Polygon
 path = "/home/ubuntu/AGRO-DATA/data"
 #path = "~/Desktop/animal_product_data.csv"
 #df = pd.read_csv(path)
-df=pd.read_csv(open('test.csv','rU'), encoding='utf-8', engine='c')
+df=pd.read_csv(open('animal_product_data.csv','rU'), encoding='utf-8', engine='c')
 df_cur = df.loc[((df["SHORT_DESC"] == ("ALPACAS - INVENTORY")))]
 #set initial variables
 config.YEARS = sorted(df_cur.YEAR.unique())
