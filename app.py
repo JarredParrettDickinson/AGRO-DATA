@@ -208,7 +208,7 @@ app.layout = html.Div(
                                                     lat=38.72490, lon=-95.61446
                                                 ),
                                                 pitch=0,
-                                                zoom=3.5,
+                                                zoom=2.80,
                                                 resetViews = True
                                             ),
                                             autosize=True,
@@ -222,7 +222,7 @@ app.layout = html.Div(
                 html.Div(
                     id="graph-container",
                     children=[
-                        html.P(id="chart-selector", children="Select chart:(at the moment only one chart)"),
+                        html.P(id="chart-selector", children="Select chart - (at the moment only one chart)"),
                         dcc.Dropdown(
                             options=[
                                 {
@@ -308,11 +308,11 @@ def display_map(unit, cat, year, state, figure):
     #change this to state and united states
     if str(state) != "United States":
         lat, lon = get_center_lat_long(state)
-        zoom = 5
+        zoom = 3.5
     else:
         lat = 38.72490
         lon = -95.61446
-        zoom = 3.5 
+        zoom = 3 
 
     layout = dict(
         mapbox=dict(
@@ -387,9 +387,11 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     for i in range(len(fips)):
         if len(fips[i]) == 4:
             fips[i] = "0" + fips[i]
-    #dff = get_sub_df(df, unit, cat, year, state)
+    dff = get_sub_df(df, unit, cat, year, state)
     #print(dff.columns)
     dff = (df[df["COUNTY_FIP"].isin(fips)]).copy()
+    if state != "United States":
+        dff = dff.loc[(dff["STATE_ALPHA"] == str(state))]
     
     dff = dff.sort_values("YEAR")
     #regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
