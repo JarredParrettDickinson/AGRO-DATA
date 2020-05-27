@@ -261,7 +261,7 @@ app.layout = html.Div(
 )
 def display_map(unit, cat, year, state, figure):
     #year, cat, state, unit, figure
-    string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
+    #string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
 
     df_cur = get_sub_df(df, unit, cat, year, state)
 
@@ -523,6 +523,6 @@ def return_year_slider(cat, state, unit):
 
 if __name__ == "__main__":
     if aws == True:
-        app.run_server(debug=True, host='0.0.0.0', port='8080')#changed this to run aws
+        app.run_server(debug=False, host='0.0.0.0', port='8080')#changed this to run aws
     else:
         app.run_server(debug=True, port='8080')
