@@ -17,12 +17,14 @@ with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-c
     counties = json.load(response)
 from geojson import Feature, Point, FeatureCollection, Polygon
 
-
+aws = True
+if aws == True:
+    path = "/home/ubuntu/AGRO-DATA/data/animal_product_data.csv"
+    df=pd.read_csv(open(path,'rU'), encoding='utf-8', engine='c')
+else:
+    path = "~/Desktop/animal_product_data.csv"
+    df = pd.read_csv(path)
 #Load Farm Data
-path = "/home/ubuntu/AGRO-DATA/data/animal_product_data.csv"
-#path = "~/Desktop/animal_product_data.csv"
-#df = pd.read_csv(path)
-df=pd.read_csv(open(path,'rU'), encoding='utf-8', engine='c')
 df_cur = df.loc[((df["SHORT_DESC"] == ("ALPACAS - INVENTORY")))]
 #set initial variables
 config.YEARS = sorted(df_cur.YEAR.unique())
@@ -38,6 +40,7 @@ app = dash.Dash(
         {"name": "viewport", "content": "width=device-width, initial-scale=1.0"}
     ],
 )
+app.title = 'Agro Data'
 server = app.server
 
 # Load data
@@ -514,4 +517,7 @@ def return_year_slider(cat, state, unit):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0', port='8080')#changed this to run aws
+    if aws == True:
+        app.run_server(debug=True, host='0.0.0.0', port='8080')#changed this to run aws
+    else:
+        app.run_server(debug=True, port='8080')
