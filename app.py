@@ -19,7 +19,8 @@ from geojson import Feature, Point, FeatureCollection, Polygon
 
 
 #Load Farm Data
-path = "~/Desktop/animal_product_data.csv"
+path = "/home/ubuntu/AGRO-DATA/data"
+#path = "~/Desktop/animal_product_data.csv"
 df = pd.read_csv(path)
 df_cur = df.loc[((df["SHORT_DESC"] == ("ALPACAS - INVENTORY")))]
 #set initial variables
