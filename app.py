@@ -53,7 +53,6 @@ df_lat_lon = pd.read_csv(
 df_lat_lon["FIPS "] = df_lat_lon["FIPS "].apply(lambda x: str(x).zfill(5))
 
 BINS = sorted(make_bins_for_cat(df_cur).val_bins.unique())
-print(BINS)
 DEFAULT_COLORSCALE = [
     "#f2fffb",
     "#bbffeb",
@@ -263,7 +262,6 @@ app.layout = html.Div(
 def display_map(unit, cat, year, state, figure):
     #year, cat, state, unit, figure
     string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
-    print(string)
 
     df_cur = get_sub_df(df, unit, cat, year, state)
 
@@ -394,7 +392,6 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     dff = (df[df["COUNTY_FIP"].isin(fips)]).copy()
     
     dff = dff.sort_values("YEAR")
-    print("made it here")
     #regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
     #dff["Age Adjusted Rate"] = dff["Age Adjusted Rate"].replace(regex_pat, 0)
 

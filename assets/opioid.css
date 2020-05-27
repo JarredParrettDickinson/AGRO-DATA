@@ -714,6 +714,7 @@ hr {
 #heatmap-container {
     margin: 2.5rem 0 0 0;
     background-color: #e7e1dd;
+    zoom: 125%
 }
 
 #heatmap-title {
@@ -772,6 +773,7 @@ hr {
     background-color:  #e7e1dd;
     padding: 5rem;
     margin: 0;
+    zoom: 120%
 }
 
 @media (max-width: 1250px) {
