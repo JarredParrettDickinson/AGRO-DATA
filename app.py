@@ -1,17 +1,35 @@
 import os
 import pathlib
 import re
-
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import pandas as pd
 from dash.dependencies import Input, Output, State
 import cufflinks as cf
+import config 
+import numpy as np
+import urllib
+from urllib.request import urlopen
+import json
+from functions import *
+with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
+    counties = json.load(response)
+from geojson import Feature, Point, FeatureCollection, Polygon
 
+
+#Load Farm Data
+path = "~/Desktop/animal_product_data.csv"
+df = pd.read_csv(path)
+df_cur = df.loc[((df["SHORT_DESC"] == ("ALPACAS - INVENTORY")))]
+#set initial variables
+config.YEARS = sorted(df_cur.YEAR.unique())
+config.CATEGORIES = sorted(df.SHORT_DESC.unique())
+config.STATES = (df.STATE_ALPHA.unique())
+config.STATES = np.append(config.STATES, "United States")
+config.DOMAINCAT_DESC = (df.DOMAINCAT_DESC.unique())
 
 # Initialize app
-
 app = dash.Dash(
     __name__,
     meta_tags=[
@@ -29,45 +47,8 @@ df_lat_lon = pd.read_csv(
 )
 df_lat_lon["FIPS "] = df_lat_lon["FIPS "].apply(lambda x: str(x).zfill(5))
 
-df_full_data = pd.read_csv(
-    os.path.join(
-        APP_PATH, os.path.join("data", "age_adjusted_death_rate_no_quotes.csv")
-    )
-)
-df_full_data["County Code"] = df_full_data["County Code"].apply(
-    lambda x: str(x).zfill(5)
-)
-df_full_data["County"] = (
-    df_full_data["Unnamed: 0"] + ", " + df_full_data.County.map(str)
-)
-
-YEARS = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
-CATEGORIES = ['CATTLE, CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD',
- 'CATTLE, (EXCL CALVES), (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD',
- 'CATTLE, INCL CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN $',
- 'HONEY, WATER WHITE & EXTRA WHITE & WHITE, WHOLESALE - PRICE RECEIVED, MEASURED IN $ / LB',
- 'HONEY, WATER WHITE & EXTRA WHITE & WHITE, RETAIL - PRICE RECEIVED, MEASURED IN $ / LB',
- 'HONEY, WATER WHITE & EXTRA WHITE & WHITE - PRICE RECEIVED, MEASURED IN $ / LB']
-
-BINS = [
-    "0-2",
-    "2.1-4",
-    "4.1-6",
-    "6.1-8",
-    "8.1-10",
-    "10.1-12",
-    "12.1-14",
-    "14.1-16",
-    "16.1-18",
-    "18.1-20",
-    "20.1-22",
-    "22.1-24",
-    "24.1-26",
-    "26.1-28",
-    "28.1-30",
-    ">30",
-]
-
+BINS = sorted(make_bins_for_cat(df_cur).val_bins.unique())
+print(BINS)
 DEFAULT_COLORSCALE = [
     "#f2fffb",
     "#bbffeb",
@@ -88,10 +69,8 @@ DEFAULT_COLORSCALE = [
 ]
 
 DEFAULT_OPACITY = 0.8
-
-mapbox_access_token = "pk.eyJ1IjoicGxvdGx5bWFwYm94IiwiYSI6ImNrOWJqb2F4djBnMjEzbG50amg0dnJieG4ifQ.Zme1-Uzoi75IaFbieBDl3A"
-mapbox_style = "mapbox://styles/plotlymapbox/cjvprkf3t1kns1cqjxuxmwixz"
-
+mapbox_access_token = "pk.eyJ1IjoiamFycmVkcGFycmV0dCIsImEiOiJja2FpaXhwZ3AwMWZwMnlvNXFyMjVoZm1kIn0.WaQOZKO-66vzeHkoAbA2vA"
+mapbox_style = "mapbox://styles/mapbox/light-v9"
 
 # App layout
 app.layout = html.Div(
@@ -100,10 +79,11 @@ app.layout = html.Div(
         html.Div(
             id="header",
             children=[
+                html.Img(id="logo", src=app.get_asset_url("logo-transparent-green.png")),
                 html.H4(children="USDA Census and Survey Animal Products"),
                 html.P(
                     id="description",
-                    children="Data sourced from the US AG Census.",
+                    children="NASS conducts hundreds of surveys each year on issues including agricultural production, economics, demographics and the environment. Every five years NASS also conducts the Census of Agriculture, providing the only source of uniform, comprehensive agricultural data for every county in the nation. More information may be found at: www.nass.usda.gov. On development, this project is still in development; if you have thoughts or feedback, please email jarred@agrodata.app",
                 ),
             ],
         ),
@@ -122,15 +102,15 @@ app.layout = html.Div(
                                 ),
                                  dcc.Dropdown(
                                     id="cat-dropdown",
-                                    value="CATTLE, CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD",
+                                    value=config.CATEGORIES[0],
+                                    clearable=False,
                                     options=[
-                                        {"label":"CATTLE, CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD", "value":"CATTLE, CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD"},
-                                        {"label":"CATTLE, (EXCL CALVES), (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD", "value":"CATTLE, (EXCL CALVES), (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN HEAD"},
-                                        {"label":"CATTLE, INCL CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN $", "value":"CATTLE, INCL CALVES, (EXCL INTER-FARM IN-STATE) - SALES, MEASURED IN $"},
-                                        {"label":"HONEY, WATER WHITE & EXTRA WHITE & WHITE, WHOLESALE - PRICE RECEIVED, MEASURED IN $ / LB", "value":"HONEY, WATER WHITE & EXTRA WHITE & WHITE, WHOLESALE - PRICE RECEIVED, MEASURED IN $ / LB"},
-                                        {"label":"HONEY, WATER WHITE & EXTRA WHITE & WHITE, RETAIL - PRICE RECEIVED, MEASURED IN $ / LB", "value":"HONEY, WATER WHITE & EXTRA WHITE & WHITE, RETAIL - PRICE RECEIVED, MEASURED IN $ / LB"},
-                                        {"label":"HONEY, WATER WHITE & EXTRA WHITE & WHITE - PRICE RECEIVED, MEASURED IN $ / LB", "value":"HONEY, WATER WHITE & EXTRA WHITE & WHITE - PRICE RECEIVED, MEASURED IN $ / LB"}
-                                        ]
+                                        {
+                                            "label": str(cat),
+                                            "value": str(cat),
+                                        }
+                                        for cat in config.CATEGORIES
+                                ],
                                 )
                             ],
                         ),html.Div(
@@ -138,15 +118,20 @@ app.layout = html.Div(
                             children=[
                                 html.P(
                                     id="selector-state-text",
-                                    children="Select State from Options:",
+                                    children="Select State:",
                                 ),
                                  dcc.Dropdown(
+                                     
                                     id="state-dropdown",
                                     value="United States",
+                                    clearable=False,
                                     options=[
-                                        {"label":"United States", "value":"United States"},
-                                        {"label":"New Jersey", "value":"New Jersey"},
-                                        ]
+                                        {
+                                            "label": str(state),
+                                            "value": str(state),
+                                        }
+                                        for state in config.STATES
+                                ]
                                 )
                             ],
                         ),html.Div(
@@ -154,15 +139,17 @@ app.layout = html.Div(
                             children=[
                                 html.P(
                                     id="selector-unit-text",
-                                    children="Select State from Options:",
-                                ),
+                                    children="Select Unit:"                                ),
                                  dcc.Dropdown(
                                     id="unit-dropdown",
-                                    value="TEST",
+                                    clearable=False,
                                     options=[
-                                        {"label":"TEST", "value":"TEST"},
-                                        {"label":"TEST", "value":"TEST"},
-                                        ]
+                                        {
+                                            "label": str(dom),
+                                            "value": str(dom),
+                                        }
+                                        for dom in config.DOMAINCAT_DESC
+                                    ]
                                 )
                             ],
                         ),
@@ -171,22 +158,21 @@ app.layout = html.Div(
                             children=[
                                 html.P(
                                     id="slider-text",
-                                    children="Drag the slider to change the year:",
+                                    children="Select a Year:",
                                 ),
-                                dcc.Slider(
+                                dcc.Dropdown(
                                     id="years-slider",
-                                    min=min(YEARS),
-                                    max=max(YEARS),
-                                    value=min(YEARS),
-                                    marks={
-                                        str(year): {
+                                    value=min(config.YEARS),
+                                    clearable=False,
+                                    options=[
+                                        {
                                             "label": str(year),
-                                            "style": {"color": "#7fafdf"},
+                                            "value": str(year),
                                         }
-                                        for year in YEARS
-                                    },
+                                        for year in config.YEARS
+                                    ]
                                 ),
-                               
+
                             ],
                         ),
                         html.Div(
@@ -194,7 +180,7 @@ app.layout = html.Div(
                             children=[
                                 html.P(
                                     "{1}: {0}".format(
-                                        min(YEARS), CATEGORIES[0]
+                                        min(config.YEARS), config.CATEGORIES[0]
                                     ),
                                     id="heatmap-title",
                                 ),
@@ -219,6 +205,7 @@ app.layout = html.Div(
                                                 ),
                                                 pitch=0,
                                                 zoom=3.5,
+                                                resetViews = True
                                             ),
                                             autosize=True,
                                         ),
@@ -231,27 +218,15 @@ app.layout = html.Div(
                 html.Div(
                     id="graph-container",
                     children=[
-                        html.P(id="chart-selector", children="Select chart:"),
+                        html.P(id="chart-selector", children="Select chart:(at the moment only one chart)"),
                         dcc.Dropdown(
                             options=[
                                 {
-                                    "label": "Histogram of total number of deaths (single year)",
-                                    "value": "show_absolute_deaths_single_year",
-                                },
-                                {
-                                    "label": "Histogram of total number of deaths (1999-2016)",
-                                    "value": "absolute_deaths_all_time",
-                                },
-                                {
-                                    "label": "Age-adjusted death rate (single year)",
-                                    "value": "show_death_rate_single_year",
-                                },
-                                {
-                                    "label": "Trends in age-adjusted death rate (1999-2016)",
-                                    "value": "death_rate_all_time",
-                                },
+                                    "label": "Selected Data",
+                                    "value": "Selected Data",
+                                }
                             ],
-                            value="show_death_rate_single_year",
+                            value="Selected Data",
                             id="chart-dropdown",
                         ),
                         dcc.Graph(
@@ -274,12 +249,21 @@ app.layout = html.Div(
 )
 
 
+#map components
 @app.callback(
     Output("county-choropleth", "figure"),
-    [Input("years-slider", "value")],
+    [Input("unit-dropdown", "value"),Input('cat-dropdown', 'value'),Input("years-slider", "value"),Input("state-dropdown", "value")],
     [State("county-choropleth", "figure")],
 )
-def display_map(year, figure):
+def display_map(unit, cat, year, state, figure):
+    #year, cat, state, unit, figure
+    string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
+    print(string)
+
+    df_cur = get_sub_df(df, unit, cat, year, state)
+
+    df_cur = make_bins_for_cat(df_cur)
+    BINS = sorted(df_cur.val_bins.unique())
     cm = dict(zip(BINS, DEFAULT_COLORSCALE))
     data = [
         dict(
@@ -291,19 +275,17 @@ def display_map(year, figure):
             marker=dict(size=5, color="white", opacity=0),
         )
     ]
-
     annotations = [
         dict(
             showarrow=False,
             align="right",
-            text="<b>Age-adjusted death rate<br>per county per year</b>",
-            font=dict(color="#2cfec1"),
-            bgcolor="#1f2630",
+            text="<b>Categories Low-High</b>",
+            font=dict(color="#1e392a"),
+            bgcolor="#f5f5f5",
             x=0.95,
             y=0.95,
         )
     ]
-
     for i, bin in enumerate(reversed(BINS)):
         color = cm[bin]
         annotations.append(
@@ -316,19 +298,18 @@ def display_map(year, figure):
                 ay=0,
                 arrowwidth=5,
                 arrowhead=0,
-                bgcolor="#1f2630",
-                font=dict(color="#2cfec1"),
+                bgcolor="#f5f5f5",
+                font=dict(color="#1e392a"),
             )
         )
-
-    if "layout" in figure:
-        lat = figure["layout"]["mapbox"]["center"]["lat"]
-        lon = figure["layout"]["mapbox"]["center"]["lon"]
-        zoom = figure["layout"]["mapbox"]["zoom"]
+    #change this to state and united states
+    if str(state) != "United States":
+        lat, lon = get_center_lat_long(state)
+        zoom = 5
     else:
-        lat = (38.72490,)
-        lon = (-95.61446,)
-        zoom = 3.5
+        lat = 38.72490
+        lon = -95.61446
+        zoom = 3.5 
 
     layout = dict(
         mapbox=dict(
@@ -342,13 +323,19 @@ def display_map(year, figure):
         margin=dict(r=0, l=0, t=0, b=0),
         annotations=annotations,
         dragmode="lasso",
+        
     )
-
-    base_url = "https://raw.githubusercontent.com/jackparmer/mapbox-counties/master/"
+        
+    
+    #it is reading the content here - tf we need to create maps with colors here 
+    #https://github.com/jackparmer/mapbox-counties/tree/master/2015
+    #base_url = "https://raw.githubusercontent.com/jackparmer/mapbox-counties/master/"
     for bin in BINS:
+        geo_df = (df_cur[(df_cur['val_bins'] == str(bin))]).copy() # geo
+        geo_json=make_geo_json(geo_df)
         geo_layer = dict(
             sourcetype="geojson",
-            source=base_url + str(year) + "/" + bin + ".geojson",
+            source=geo_json,
             type="fill",
             color=cm[bin],
             opacity=DEFAULT_OPACITY,
@@ -361,10 +348,12 @@ def display_map(year, figure):
     return fig
 
 
+
 @app.callback(Output("heatmap-title", "children"), [Input("years-slider", "value"),Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
 def update_map_title(year, cat, state):
-    out_string = str(year)+", " + str(state)+":    " + str(cat)
+    out_string = str(year)+", " + str(state.upper())+",    " + str(cat)
     return out_string
+
 
 
 @app.callback(
@@ -373,17 +362,20 @@ def update_map_title(year, cat, state):
         Input("county-choropleth", "selectedData"),
         Input("chart-dropdown", "value"),
         Input("years-slider", "value"),
+        Input('cat-dropdown', 'value'),
+        Input("state-dropdown", "value"), 
+        Input("unit-dropdown", "value")
     ],
 )
-def display_selected_data(selectedData, chart_dropdown, year):
+def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     if selectedData is None:
         return dict(
             data=[dict(x=0, y=0)],
             layout=dict(
                 title="Click-drag on the map to select counties",
-                paper_bgcolor="#1f2630",
-                plot_bgcolor="#1f2630",
-                font=dict(color="#2cfec1"),
+                paper_bgcolor="#f5f5f5",
+                plot_bgcolor="#f5f5f5",
+                font=dict(color="#828081"),
                 margin=dict(t=75, r=50, b=100, l=75),
             ),
         )
@@ -392,116 +384,131 @@ def display_selected_data(selectedData, chart_dropdown, year):
     for i in range(len(fips)):
         if len(fips[i]) == 4:
             fips[i] = "0" + fips[i]
-    dff = df_full_data[df_full_data["County Code"].isin(fips)]
-    dff = dff.sort_values("Year")
+    #dff = get_sub_df(df, unit, cat, year, state)
+    #print(dff.columns)
+    dff = (df[df["COUNTY_FIP"].isin(fips)]).copy()
+    
+    dff = dff.sort_values("YEAR")
+    print("made it here")
+    #regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
+    #dff["Age Adjusted Rate"] = dff["Age Adjusted Rate"].replace(regex_pat, 0)
 
-    regex_pat = re.compile(r"Unreliable", flags=re.IGNORECASE)
-    dff["Age Adjusted Rate"] = dff["Age Adjusted Rate"].replace(regex_pat, 0)
+    #gets data
+    #get dataframe
 
-    if chart_dropdown != "death_rate_all_time":
-        title = "Absolute deaths per county, <b>1999-2016</b>"
-        AGGREGATE_BY = "Deaths"
-        if "show_absolute_deaths_single_year" == chart_dropdown:
-            dff = dff[dff.Year == year]
-            title = "Absolute deaths per county, <b>{0}</b>".format(year)
-        elif "show_death_rate_single_year" == chart_dropdown:
-            dff = dff[dff.Year == year]
-            title = "Age-adjusted death rate per county, <b>{0}</b>".format(year)
-            AGGREGATE_BY = "Age Adjusted Rate"
-
-        dff[AGGREGATE_BY] = pd.to_numeric(dff[AGGREGATE_BY], errors="coerce")
-        deaths_or_rate_by_fips = dff.groupby("County")[AGGREGATE_BY].sum()
-        deaths_or_rate_by_fips = deaths_or_rate_by_fips.sort_values()
-        # Only look at non-zero rows:
-        deaths_or_rate_by_fips = deaths_or_rate_by_fips[deaths_or_rate_by_fips > 0]
-        fig = deaths_or_rate_by_fips.iplot(
-            kind="bar", y=AGGREGATE_BY, title=title, asFigure=True
-        )
-
-        fig_layout = fig["layout"]
-        fig_data = fig["data"]
-
-        fig_data[0]["text"] = deaths_or_rate_by_fips.values.tolist()
-        fig_data[0]["marker"]["color"] = "#2cfec1"
-        fig_data[0]["marker"]["opacity"] = 1
-        fig_data[0]["marker"]["line"]["width"] = 0
-        fig_data[0]["textposition"] = "outside"
-        fig_layout["paper_bgcolor"] = "#1f2630"
-        fig_layout["plot_bgcolor"] = "#1f2630"
-        fig_layout["font"]["color"] = "#2cfec1"
-        fig_layout["title"]["font"]["color"] = "#2cfec1"
-        fig_layout["xaxis"]["tickfont"]["color"] = "#2cfec1"
-        fig_layout["yaxis"]["tickfont"]["color"] = "#2cfec1"
-        fig_layout["xaxis"]["gridcolor"] = "#5b5b5b"
-        fig_layout["yaxis"]["gridcolor"] = "#5b5b5b"
-        fig_layout["margin"]["t"] = 75
-        fig_layout["margin"]["r"] = 50
-        fig_layout["margin"]["b"] = 100
-        fig_layout["margin"]["l"] = 50
-
-        return fig
-
-    fig = dff.iplot(
-        kind="area",
-        x="Year",
-        y="Age Adjusted Rate",
-        text="County",
-        categories="County",
-        colors=[
-            "#1b9e77",
-            "#d95f02",
-            "#7570b3",
-            "#e7298a",
-            "#66a61e",
-            "#e6ab02",
-            "#a6761d",
-            "#666666",
-            "#1b9e77",
-        ],
-        vline=[year],
-        asFigure=True,
+    title = str(year)+", " + str(state.upper())+",    " + str(cat) + " for selection"
+    dff= get_sub_df(dff, unit, cat, year, "United States").copy()
+    dff = add_state_county_string(dff)
+    AGGREGATE_BY = "VALUE"
+    
+    dff[AGGREGATE_BY] = pd.to_numeric(dff[AGGREGATE_BY], errors="coerce")
+    deaths_or_rate_by_fips = dff.groupby("STATE_COUNTY")[AGGREGATE_BY].sum()
+    deaths_or_rate_by_fips = deaths_or_rate_by_fips.sort_values()
+    # Only look at non-zero rows:
+    deaths_or_rate_by_fips = deaths_or_rate_by_fips[deaths_or_rate_by_fips > 0]
+    fig = deaths_or_rate_by_fips.iplot(
+        kind="bar", y=AGGREGATE_BY, title=title, asFigure=True
     )
 
-    for i, trace in enumerate(fig["data"]):
-        trace["mode"] = "lines+markers"
-        trace["marker"]["size"] = 4
-        trace["marker"]["line"]["width"] = 1
-        trace["type"] = "scatter"
-        for prop in trace:
-            fig["data"][i][prop] = trace[prop]
-
-    # Only show first 500 lines
-    fig["data"] = fig["data"][0:500]
-
     fig_layout = fig["layout"]
+    fig_data = fig["data"]
 
-    # See plot.ly/python/reference
-    fig_layout["yaxis"]["title"] = "Age-adjusted death rate per county per year"
-    fig_layout["xaxis"]["title"] = ""
-    fig_layout["yaxis"]["fixedrange"] = True
-    fig_layout["xaxis"]["fixedrange"] = False
-    fig_layout["hovermode"] = "closest"
-    fig_layout["title"] = "<b>{0}</b> counties selected".format(len(fips))
-    fig_layout["legend"] = dict(orientation="v")
-    fig_layout["autosize"] = True
-    fig_layout["paper_bgcolor"] = "#1f2630"
-    fig_layout["plot_bgcolor"] = "#1f2630"
-    fig_layout["font"]["color"] = "#2cfec1"
-    fig_layout["xaxis"]["tickfont"]["color"] = "#2cfec1"
-    fig_layout["yaxis"]["tickfont"]["color"] = "#2cfec1"
+    fig_data[0]["text"] = deaths_or_rate_by_fips.values.tolist()
+    fig_data[0]["marker"]["color"] = "#c9d2d3"
+    fig_data[0]["marker"]["opacity"] = 1
+    fig_data[0]["marker"]["line"]["width"] = 0
+    fig_data[0]["textposition"] = "outside"
+    fig_layout["paper_bgcolor"] = "#f5f5f5"#"#1f2630"
+    fig_layout["plot_bgcolor"] = "#f5f5f5"#"#1f2630"
+    fig_layout["font"]["color"] = "#1e392a"
+    fig_layout["title"]["font"]["color"] = "#1e392a"
+    fig_layout["xaxis"]["tickfont"]["color"] = "#1e392a"
+    fig_layout["yaxis"]["tickfont"]["color"] = "#1e392a"
     fig_layout["xaxis"]["gridcolor"] = "#5b5b5b"
     fig_layout["yaxis"]["gridcolor"] = "#5b5b5b"
-
-    if len(fips) > 500:
-        fig["layout"][
-            "title"
-        ] = "Age-adjusted death rate per county per year <br>(only 1st 500 shown)"
+    fig_layout["margin"]["t"] = 75
+    fig_layout["margin"]["r"] = 50
+    fig_layout["margin"]["b"] = 100
+    fig_layout["margin"]["l"] = 50
 
     return fig
 
+#Unit dropdown updater
+@app.callback(Output('unit-dropdown', 'options'),
+              [Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
+def return_dom_list(cat,state):
+    df_cur = None
+    if state == "United States":
+        df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
+    else:
+        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["STATE_ALPHA"] == str(state)))]
+    config.DOMAINCAT_DESC=df_cur.DOMAINCAT_DESC.unique()
+    options=[
+            {
+                "label": str(dom),
+                "value": str(dom),
+            }
+            for dom in config.DOMAINCAT_DESC
+    ]
+    return options
+
+#Unit dropdown updater
+@app.callback(Output('unit-dropdown', 'value'),
+              [Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
+def return_dom_value(cat,state):
+    return config.DOMAINCAT_DESC[0]
+
+#State dropdown updater
+@app.callback(Output('state-dropdown', 'options'),
+              [Input("cat-dropdown", "value")])
+def return_state_list(cat):
+    df_cur = df.loc[((df["SHORT_DESC"] == str(cat)))]
+    states = sorted(df_cur.STATE_ALPHA.unique())
+    states = np.append (states, "United States")
+    config.STATES = (states)
+    options=[
+            {
+                "label": str(state),
+                "value": str(state),
+            }
+            for state in config.STATES
+    ]
+    return options
+
+#Set Value to United States
+@app.callback(Output('state-dropdown', 'value'),
+              [Input("cat-dropdown", "value")])
+def return_default_state(cat):
+    return "United States"
 
 
 
+#Year slider updater
+
+@app.callback(Output('years-slider', 'value'),
+              [Input('cat-dropdown', 'value'), Input('years-slider', 'options')])
+def return_year_slider_min(cat, opts):
+    y = min(config.YEARS)
+    return y
+
+
+@app.callback(Output('years-slider', 'options'),
+              [Input('cat-dropdown', 'value'),Input("state-dropdown", "value"), Input("unit-dropdown", "value")])
+def return_year_slider(cat, state, unit):
+    df_cur = None
+    if state == "United States":
+        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["DOMAINCAT_DESC"] == str(unit)))]
+    else:
+        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["DOMAINCAT_DESC"] == str(unit))&(df["STATE_ALPHA"] == str(state)))]
+    config.YEARS=sorted(df_cur.YEAR.unique())
+    options=[
+            {
+                "label": str(year),
+                "value": str(year),
+            }
+            for year in config.YEARS
+    ]
+    return options
 
 
 if __name__ == "__main__":
