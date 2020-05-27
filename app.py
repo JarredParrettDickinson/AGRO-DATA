@@ -400,7 +400,7 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     #gets data
     #get dataframe
 
-    title = str(year)+", " + str(state.upper())+"<br>"+"," + str(cat)
+    title = str(year)+", " + str(state.upper())+"<br>"+ str(cat)
     dff= get_sub_df(dff, unit, cat, year, "United States").copy()
     dff = add_state_county_string(dff)
     AGGREGATE_BY = "VALUE"
