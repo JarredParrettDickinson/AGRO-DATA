@@ -1,5 +1,4 @@
 # AGRO-DATA
-## Home of the online app AGRODATA
 ![Logo](/assets/logo-transparent-green.png)
 
 * Agro Data is my effort to find a better tool for understanding the nature of US agriculture in the United States. 
