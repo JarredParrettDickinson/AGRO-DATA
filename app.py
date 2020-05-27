@@ -461,6 +461,12 @@ def return_dom_list(cat,state):
 @app.callback(Output('unit-dropdown', 'value'),
               [Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
 def return_dom_value(cat,state):
+    df_cur = None
+    if state == "United States":
+        df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
+    else:
+        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["STATE_ALPHA"] == str(state)))]
+    config.DOMAINCAT_DESC=df_cur.DOMAINCAT_DESC.unique()
     return config.DOMAINCAT_DESC[0]
 
 #State dropdown updater
@@ -493,6 +499,8 @@ def return_default_state(cat):
 @app.callback(Output('years-slider', 'value'),
               [Input('cat-dropdown', 'value'), Input('years-slider', 'options')])
 def return_year_slider_min(cat, opts):
+    if len(config.YEARS) == 0:
+        return 0
     y = min(config.YEARS)
     return y
 
