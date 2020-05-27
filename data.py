@@ -103,5 +103,5 @@ df_animal_product=value_convert(df_animal_product)
 print("pre get geo info")
 df_animal_product = get_geo_info(df_animal_product)
 print("pre writing file")
-path = "...enter file path out"
+path = "~/data/animal_product_data.csv"
 df_animal_product.to_csv(path)
