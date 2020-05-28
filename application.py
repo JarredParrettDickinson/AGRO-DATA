@@ -525,6 +525,6 @@ def return_year_slider(cat, state, unit):
 
 if __name__ == "__main__":
     if aws == True:
-        app.run_server(debug=False, host='0.0.0.0', port='80')#changed this to run aws
+        app.run_server(debug=False, host='0.0.0.0', port='8080')#changed this to run aws
     else:
         app.run_server(debug=True, port='8080')
