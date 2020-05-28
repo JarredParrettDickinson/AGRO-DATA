@@ -17,7 +17,7 @@ with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-c
     counties = json.load(response)
 from geojson import Feature, Point, FeatureCollection, Polygon
 
-aws = True
+aws = False
 if aws == True:
     path = "/home/ubuntu/AGRO-DATA/data/animal_product_data.csv"
     df=pd.read_csv(open(path,'rU'), encoding='utf-8', engine='c')
