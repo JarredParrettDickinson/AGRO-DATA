@@ -13,25 +13,37 @@ import urllib
 from urllib.request import urlopen
 import json
 from functions import *
+from database import *
 with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
     counties = json.load(response)
 from geojson import Feature, Point, FeatureCollection, Polygon
+import pyodbc
+from sqlalchemy import create_engine
+# Update connection string information
+server = "agrodatadb.database.windows.net"
+database = "agrodatadb"
+username = "JarredParrett"
+password = "8!DEzXjlfPKXYTff"
 
-aws = True
-if aws == True:
-    path = "/home/ubuntu/AGRO-DATA/data/animal_product_data.csv"
-    df=pd.read_csv(open(path,'rU'), encoding='utf-8', engine='c')
-else:
-    path = "~/Desktop/animal_product_data.csv"
-    df = pd.read_csv(path)
+params = urllib.parse.quote_plus \
+(r' Driver={ODBC Driver 17 for SQL Server};Server=tcp:agrodatadb.database.windows.net,1433;Database=agrodata;Uid=JarredParrett;Pwd=8!DEzXjlfPKXYTff;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
+conn_str = 'mssql+pyodbc:///?odbc_connect={}'.format(params)
+engine_azure = create_engine(conn_str,echo=True)
+
+
 #Load Farm Data
-df_cur = df.loc[((df["SHORT_DESC"] == ("ALPACAS - INVENTORY")))]
+df_cur = get_sub_df(None,"ALPACAS - INVENTORY", None, "United States")
+df_years = pd.read_csv("~/Downloads/years.csv")
+df_cat = pd.read_csv("~/Downloads/SHORT_DESC.csv")
+df_dom= pd.read_csv("~/Downloads/DOMAINCAT_DESC.csv")
+df_states = pd.read_csv("~/Downloads/states.csv")
+
 #set initial variables
 config.YEARS = sorted(df_cur.YEAR.unique())
-config.CATEGORIES = sorted(df.SHORT_DESC.unique())
-config.STATES = (df.STATE_ALPHA.unique())
+config.CATEGORIES = sorted(df_cat.SHORT_DESC.unique())
+config.STATES = (df_states.STATE_ALPHA.unique())
 config.STATES = np.append(config.STATES, "United States")
-config.DOMAINCAT_DESC = (df.DOMAINCAT_DESC.unique())
+config.DOMAINCAT_DESC = (df_dom.DOMAINCAT_DESC.unique())
 
 # Initialize app
 app = dash.Dash(
@@ -249,6 +261,9 @@ app.layout = html.Div(
                 ),
             ],
         ),
+        html.Div(
+            id="footer",
+        )
     ],
 )
 
@@ -261,9 +276,9 @@ app.layout = html.Div(
 )
 def display_map(unit, cat, year, state, figure):
     #year, cat, state, unit, figure
-    #string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
-
-    df_cur = get_sub_df(df, unit, cat, year, state)
+    string = "year: " + str(year) + " cat: " + str(cat) +  " state: " + str(state) + " unit: " + str(unit)
+    print(string)
+    df_cur = get_sub_df(unit, cat, year, state)
 
     df_cur = make_bins_for_cat(df_cur)
     BINS = sorted(df_cur.val_bins.unique())
@@ -387,9 +402,9 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     for i in range(len(fips)):
         if len(fips[i]) == 4:
             fips[i] = "0" + fips[i]
-    dff = get_sub_df(df, unit, cat, year, state)
+    dff = get_sub_df(unit, cat, year, state)
     #print(dff.columns)
-    dff = (df[df["COUNTY_FIP"].isin(fips)]).copy()
+    dff = (dff[dff["COUNTY_FIP"].isin(fips)]).copy()
     if state != "United States":
         dff = dff.loc[(dff["STATE_ALPHA"] == str(state))]
     
@@ -401,7 +416,7 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
     #get dataframe
 
     title = str(year)+", " + str(state.upper())+"<br>"+ str(cat)
-    dff= get_sub_df(dff, unit, cat, year, "United States").copy()
+    dff= get_sub_df(unit, cat, year, "United States").copy()
     dff = add_state_county_string(dff)
     AGGREGATE_BY = "VALUE"
     
@@ -441,11 +456,7 @@ def display_selected_data(selectedData, chart_dropdown, year, cat, state, unit):
 @app.callback(Output('unit-dropdown', 'options'),
               [Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
 def return_dom_list(cat,state):
-    df_cur = None
-    if state == "United States":
-        df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
-    else:
-        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["STATE_ALPHA"] == str(state)))]
+    df_cur = get_sub_df(None, cat, None, state)
     config.DOMAINCAT_DESC=df_cur.DOMAINCAT_DESC.unique()
     options=[
             {
@@ -461,10 +472,7 @@ def return_dom_list(cat,state):
               [Input("cat-dropdown", "value"),Input("state-dropdown", "value")])
 def return_dom_value(cat,state):
     df_cur = None
-    if state == "United States":
-        df_cur = df.loc[(df["SHORT_DESC"] == str(cat))]
-    else:
-        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["STATE_ALPHA"] == str(state)))]
+    df_cur = get_sub_df(None, cat, None, state)
     config.DOMAINCAT_DESC=df_cur.DOMAINCAT_DESC.unique()
     return config.DOMAINCAT_DESC[0]
 
@@ -472,7 +480,7 @@ def return_dom_value(cat,state):
 @app.callback(Output('state-dropdown', 'options'),
               [Input("cat-dropdown", "value")])
 def return_state_list(cat):
-    df_cur = df.loc[((df["SHORT_DESC"] == str(cat)))]
+    df_cur = get_sub_df(None, cat, None, None)
     states = sorted(df_cur.STATE_ALPHA.unique())
     states = np.append (states, "United States")
     config.STATES = (states)
@@ -507,11 +515,7 @@ def return_year_slider_min(cat, opts):
 @app.callback(Output('years-slider', 'options'),
               [Input('cat-dropdown', 'value'),Input("state-dropdown", "value"), Input("unit-dropdown", "value")])
 def return_year_slider(cat, state, unit):
-    df_cur = None
-    if state == "United States":
-        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["DOMAINCAT_DESC"] == str(unit)))]
-    else:
-        df_cur = df.loc[((df["SHORT_DESC"] == str(cat))&(df["DOMAINCAT_DESC"] == str(unit))&(df["STATE_ALPHA"] == str(state)))]
+    df_cur = get_sub_df(unit, cat, None, state)
     config.YEARS=sorted(df_cur.YEAR.unique())
     options=[
             {
@@ -521,10 +525,11 @@ def return_year_slider(cat, state, unit):
             for year in config.YEARS
     ]
     return options
+    
 
 
 if __name__ == "__main__":
-    if aws == True:
+    if False == True:
         app.run_server(debug=False, host='0.0.0.0', port='8080')#changed this to run aws
     else:
         app.run_server(debug=True, port='8080')
