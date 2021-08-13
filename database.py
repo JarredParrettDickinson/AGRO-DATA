@@ -6,8 +6,8 @@ from pandas import DataFrame
 # Update connection string information
 server = "agrodatadb.database.windows.net"
 database = "agrodatadb"
-username = "JarredParrett"
-password = "8!DEzXjlfPKXYTff"
+username = ""
+password = ""
 
 params = urllib.parse.quote_plus \
 (r' Driver={ODBC Driver 17 for SQL Server};Server=tcp:agrodatadb.database.windows.net,1433;Database=agrodata;Uid=JarredParrett;Pwd=8!DEzXjlfPKXYTff;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
